@@ -89,30 +89,16 @@ public class DailySummaryScheduler {
             }
 
             String replyText = buildReplyText(summary);
-            int succeeded = 0;
             for (var tweet : othersTweets) {
                 try {
                     long replyId = twitterService.replyToTweet(
                         Long.parseLong(tweet.get("id")), replyText);
-                    log.info("Replied directly to tweet {} (eng: {}) -> {}",
+                    log.info("Replied to tweet {} (eng: {}) -> {}",
                         tweet.get("id"), tweet.get("engagement"), replyId);
-                    succeeded++;
                     Thread.sleep(2000);
                 } catch (Exception e) {
-                    log.warn("Direct reply to {} blocked — {}", tweet.get("id"), e.getMessage());
+                    log.error("Failed to reply to tweet {} — {}", tweet.get("id"), e.getMessage());
                 }
-            }
-
-            if (succeeded == 0) {
-                StringBuilder sb = new StringBuilder("People talking about AI right now:\n");
-                for (var tweet : othersTweets) {
-                    sb.append("\ntwitter.com/i/status/").append(tweet.get("id"));
-                }
-                if (sb.length() > 280) sb.setLength(277);
-                long fallbackId = twitterService.replyToTweet(threadTweetIds.getFirst(), sb.toString());
-                log.info("Fallback: posted links to {} others' tweets as reply {}", othersTweets.size(), fallbackId);
-            } else {
-                log.info("Directly replied to {}/{} tweets", succeeded, othersTweets.size());
             }
         } catch (Exception e) {
             log.error("Search and engage failed", e);
