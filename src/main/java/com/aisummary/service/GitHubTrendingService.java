@@ -11,12 +11,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GitHubTrendingService {
@@ -39,22 +44,51 @@ public class GitHubTrendingService {
         this.objectMapper = objectMapper;
     }
 
+    private String resolveToken() {
+        if (githubToken != null && !githubToken.isBlank()) {
+            return githubToken;
+        }
+        Path hostsFile = Path.of(System.getProperty("user.home"), ".config/gh/hosts.yml");
+        if (!Files.exists(hostsFile)) {
+            log.debug("No gh hosts.yml found at {}", hostsFile);
+            return null;
+        }
+        try {
+            String content = Files.readString(hostsFile);
+            Map<String, Object> config = new Yaml().load(content);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> ghEntry = (Map<String, Object>) config.get("github.com");
+            if (ghEntry != null) {
+                String token = (String) ghEntry.get("oauth_token");
+                if (token != null && !token.isBlank()) {
+                    log.info("Using GitHub token from gh CLI config");
+                    return token;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("Failed to read gh CLI config: {}", e.getMessage());
+        }
+        return null;
+    }
+
     public List<TrendingRepo> fetchTopAiRepos() {
         String yesterday = Instant.now().minus(1, ChronoUnit.DAYS).toString().substring(0, 10);
         String query = String.format(
-            "topic:machine-learning+topic:deep-learning+topic:llm+topic:large-language-model+"
-            + "topic:generative-ai+topic:ai-agent+topic:rag+topic:transformer+"
+            "topic:machine-learning,topic:deep-learning,topic:llm,topic:large-language-model,"
+            + "topic:generative-ai,topic:ai-agent,topic:rag,topic:transformer+"
             + "pushed:>%s",
             yesterday
         );
         String url = String.format("%s?q=%s&sort=stars&order=desc&per_page=%d",
             SEARCH_URL, query, searchLimit);
 
+        String token = resolveToken();
+
         var headers = new HttpHeaders();
         headers.set("Accept", "application/vnd.github+json");
         headers.set("X-GitHub-Api-Version", "2022-11-28");
-        if (githubToken != null && !githubToken.isBlank()) {
-            headers.set("Authorization", "Bearer " + githubToken);
+        if (token != null) {
+            headers.set("Authorization", "Bearer " + token);
         }
         headers.set("User-Agent", "ai-summary-bot");
 
