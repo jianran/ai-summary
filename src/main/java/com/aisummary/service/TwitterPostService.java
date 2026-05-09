@@ -24,7 +24,7 @@ public class TwitterPostService {
     private static final Logger log = LoggerFactory.getLogger(TwitterPostService.class);
     private static final int MAX_TWEET_LENGTH = 280;
     private static final String TWEET_URL = "https://api.twitter.com/2/tweets";
-    private static final String SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent";
+    private static final String SEARCH_URL = "https://api.twitter.com/2/tweets/search/all";
     private static final String TOKEN_URL = "https://api.twitter.com/oauth2/token";
     private static final String OAUTH_SIGNATURE_METHOD = "HMAC-SHA1";
     private static final String OAUTH_VERSION = "1.0";
@@ -118,7 +118,7 @@ public class TwitterPostService {
             headers.set("Authorization", "Bearer " + token);
 
             while (allResults.size() < totalResults) {
-                int perPage = Math.min(100, totalResults - allResults.size());
+                int perPage = Math.min(500, totalResults - allResults.size());
                 var builder = UriComponentsBuilder.fromHttpUrl(SEARCH_URL)
                     .queryParam("query", query)
                     .queryParam("max_results", perPage)
