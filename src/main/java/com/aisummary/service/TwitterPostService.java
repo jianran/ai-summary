@@ -25,24 +25,74 @@ public class TwitterPostService {
     private static final Logger log = LoggerFactory.getLogger(TwitterPostService.class);
     private static final int MAX_TWEET_LENGTH = 280;
     private static final String TWEET_URL = "https://api.twitter.com/2/tweets";
+    private static final String SEARCH_URL = "https://api.twitter.com/2/tweets/search/recent";
     private static final String OAUTH_SIGNATURE_METHOD = "HMAC-SHA1";
     private static final String OAUTH_VERSION = "1.0";
-    private static final String TWITTER_API_URL = "https://api.twitter.com/2/tweets";
+
+    private static final String TOKEN_URL = "https://api.twitter.com/oauth2/token";
 
     private final String consumerKey;
     private final String consumerSecret;
     private final String accessToken;
     private final String accessTokenSecret;
+    private final String clientId;
+    private final String clientSecret;
+    private final String bearerToken;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+
+    private volatile String cachedBearerToken;
 
     public TwitterPostService(TwitterConfig config, ObjectMapper objectMapper) {
         this.consumerKey = config.getConsumerKey();
         this.consumerSecret = config.getConsumerSecret();
         this.accessToken = config.getAccessToken();
         this.accessTokenSecret = config.getAccessTokenSecret();
+        this.clientId = config.getClientId();
+        this.clientSecret = config.getClientSecret();
+        this.bearerToken = config.getBearerToken();
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper;
+    }
+
+    private String getBearerToken() {
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            return bearerToken;
+        }
+        if (cachedBearerToken != null) {
+            return cachedBearerToken;
+        }
+        cachedBearerToken = fetchBearerToken();
+        return cachedBearerToken;
+    }
+
+    private String fetchBearerToken() {
+        if (clientId == null || clientSecret == null
+                || clientId.isBlank() || clientSecret.isBlank()) {
+            log.warn("No Twitter OAuth 2.0 credentials configured");
+            return null;
+        }
+        try {
+            String credentials = clientId + ":" + clientSecret;
+            String encoded = Base64.getEncoder()
+                .encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
+
+            var headers = new HttpHeaders();
+            headers.set("Authorization", "Basic " + encoded);
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            var request = new HttpEntity<>("grant_type=client_credentials", headers);
+            var response = restTemplate.exchange(
+                TOKEN_URL, HttpMethod.POST, request, String.class);
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            String token = root.get("access_token").asText();
+            log.info("Obtained Bearer Token via OAuth 2.0 App-Only flow");
+            return token;
+        } catch (Exception e) {
+            log.error("Failed to fetch Bearer Token via OAuth 2.0", e);
+            return null;
+        }
     }
 
     /**
@@ -75,6 +125,58 @@ public class TwitterPostService {
         return tweetIds;
     }
 
+    /**
+     * Search recent tweets matching the query using Bearer Token (OAuth 2.0).
+     * Returns up to maxResults tweets with their IDs, text, and metrics.
+     */
+    public List<Map<String, String>> searchRecentTweets(String query, int maxResults) {
+        String token = getBearerToken();
+        if (token == null) {
+            log.warn("No Twitter Bearer Token available — skipping search");
+            return List.of();
+        }
+        try {
+            var headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+
+            String url = SEARCH_URL + "?query=" + percentEncode(query)
+                + "&max_results=" + maxResults
+                + "&tweet.fields=public_metrics,author_id";
+
+            var response = restTemplate.exchange(
+                url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            List<Map<String, String>> results = new ArrayList<>();
+            JsonNode data = root.get("data");
+            if (data != null && data.isArray()) {
+                for (JsonNode tweet : data) {
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put("id", tweet.get("id").asText());
+                    entry.put("text", tweet.get("text").asText());
+                    JsonNode metrics = tweet.get("public_metrics");
+                    if (metrics != null) {
+                        entry.put("likes", String.valueOf(metrics.get("like_count").asInt(0)));
+                        entry.put("retweets", String.valueOf(metrics.get("retweet_count").asInt(0)));
+                    }
+                    results.add(entry);
+                }
+            }
+            log.info("Found {} related tweets for query: {}", results.size(), query);
+            return results;
+        } catch (Exception e) {
+            log.error("Failed to search tweets for query: {}", query, e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Reply to a specific tweet.
+     */
+    public long replyToTweet(long tweetId, String text) throws Exception {
+        return postTweet(text, tweetId);
+    }
+
     private long postTweet(String text, Long inReplyToId) throws Exception {
         Map<String, Object> body = new HashMap<>();
         body.put("text", text);
@@ -104,6 +206,10 @@ public class TwitterPostService {
     }
 
     private String buildOAuthHeader() throws Exception {
+        return buildOAuthHeader("POST", TWEET_URL, Map.of());
+    }
+
+    private String buildOAuthHeader(String method, String url, Map<String, String> queryParams) throws Exception {
         String nonce = generateNonce();
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
 
@@ -115,7 +221,7 @@ public class TwitterPostService {
         oauthParams.put("oauth_token", accessToken);
         oauthParams.put("oauth_version", OAUTH_VERSION);
 
-        String signature = generateSignature(oauthParams);
+        String signature = generateSignature(method, url, oauthParams, queryParams);
         oauthParams.put("oauth_signature", signature);
 
         StringBuilder header = new StringBuilder("OAuth ");
@@ -131,12 +237,12 @@ public class TwitterPostService {
         return header.toString();
     }
 
-    private String generateSignature(Map<String, String> params) throws Exception {
-        // Collect all params including oauth params
-        Map<String, String> allParams = new TreeMap<>(params);
+    private String generateSignature(String method, String url,
+            Map<String, String> oauthParams, Map<String, String> queryParams) throws Exception {
+        Map<String, String> allParams = new TreeMap<>(oauthParams);
         allParams.remove("oauth_signature");
+        allParams.putAll(queryParams);
 
-        // Build parameter string
         StringBuilder paramString = new StringBuilder();
         boolean first = true;
         for (var entry : allParams.entrySet()) {
@@ -147,8 +253,8 @@ public class TwitterPostService {
             first = false;
         }
 
-        String signatureBase = "POST&"
-            + percentEncode(TWITTER_API_URL) + "&"
+        String signatureBase = method + "&"
+            + percentEncode(url) + "&"
             + percentEncode(paramString.toString());
 
         String signingKey = percentEncode(consumerSecret) + "&" + percentEncode(accessTokenSecret);

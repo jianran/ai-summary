@@ -26,12 +26,15 @@ github:
   search:
     limit: 10
 
-# Twitter/X API credentials (OAuth 1.0a)
+# Twitter/X API credentials (OAuth 1.0a + OAuth 2.0 for search)
 twitter:
   consumer-key: ${TWITTER_CONSUMER_KEY:}
   consumer-secret: ${TWITTER_CONSUMER_SECRET:}
   access-token: ${TWITTER_ACCESS_TOKEN:}
   access-token-secret: ${TWITTER_ACCESS_TOKEN_SECRET:}
+  client-id: ${TWITTER_CLIENT_ID:}
+  client-secret: ${TWITTER_CLIENT_SECRET:}
+  bearer-token: ${TWITTER_BEARER_TOKEN:}
 
 # Application settings
 app:
