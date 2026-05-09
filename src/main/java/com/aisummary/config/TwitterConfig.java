@@ -11,9 +11,6 @@ public class TwitterConfig {
     private String consumerSecret;
     private String accessToken;
     private String accessTokenSecret;
-    private String clientId;
-    private String clientSecret;
-    private String bearerToken;
 
     public String getConsumerKey() { return consumerKey; }
     public void setConsumerKey(String consumerKey) { this.consumerKey = consumerKey; }
@@ -26,22 +23,4 @@ public class TwitterConfig {
 
     public String getAccessTokenSecret() { return accessTokenSecret; }
     public void setAccessTokenSecret(String accessTokenSecret) { this.accessTokenSecret = accessTokenSecret; }
-
-    public String getClientId() { return clientId; }
-    public void setClientId(String clientId) { this.clientId = clientId; }
-
-    public String getClientSecret() { return clientSecret; }
-    public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
-
-    public String getBearerToken() { return bearerToken; }
-    public void setBearerToken(String bearerToken) { this.bearerToken = bearerToken; }
-
-    private String userAccessToken;
-    private String userRefreshToken;
-
-    public String getUserAccessToken() { return userAccessToken; }
-    public void setUserAccessToken(String userAccessToken) { this.userAccessToken = userAccessToken; }
-
-    public String getUserRefreshToken() { return userRefreshToken; }
-    public void setUserRefreshToken(String userRefreshToken) { this.userRefreshToken = userRefreshToken; }
 }
