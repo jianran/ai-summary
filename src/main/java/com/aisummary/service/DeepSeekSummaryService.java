@@ -25,7 +25,8 @@ public class DeepSeekSummaryService {
         - Write in English
         - Keep each tweet under 280 characters
         - First tweet: an engaging headline + "🧵" emoji
-        - Middle tweets: one repo per tweet with name, what it does, why it matters (use emojis sparingly)
+        - Middle tweets: one repo per tweet with name, what it does, why it matters, \
+          and the GitHub URL at the end (use emojis sparingly)
         - Last tweet: overall trend/key takeaway
         - Max 5 tweets total
         - No hashtag spam (2-3 max per tweet)
