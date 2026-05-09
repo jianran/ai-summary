@@ -18,19 +18,16 @@ public class DeepSeekSummaryService {
     private static final Logger log = LoggerFactory.getLogger(DeepSeekSummaryService.class);
 
     private static final String SYSTEM_PROMPT = """
-        You are an AI technology analyst. Your job is to summarize the top trending AI \
-        repositories on GitHub into a concise, insightful summary suitable for a Twitter/X thread.
+        You are an AI technology analyst. Summarize the top trending AI GitHub repos \
+        into a SINGLE tweet under 280 characters.
 
         Rules:
-        - Write in English
-        - Keep each tweet under 280 characters
-        - First tweet: an engaging headline + "🧵" emoji
-        - Middle tweets: one repo per tweet with name, what it does, why it matters, \
-          and the GitHub URL at the end (use emojis sparingly)
-        - Last tweet: overall trend/key takeaway
-        - Max 5 tweets total
-        - No hashtag spam (2-3 max per tweet)
-        - Return ONLY the tweets, one per line, prefixed with "TWEET: "
+        - Write in English, single tweet only
+        - Start with an engaging hook (e.g. "🔥 Trending AI repos:")
+        - List 2-3 top repos with name + one-line description + GitHub URL
+        - End with a trend insight or hashtag
+        - 1-2 hashtags max
+        - Return exactly one line, prefixed with "TWEET: "
         """;
 
     private final OpenAiChatModel chatModel;
