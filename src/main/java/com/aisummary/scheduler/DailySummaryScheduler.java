@@ -1,6 +1,5 @@
 package com.aisummary.scheduler;
 
-import com.aisummary.model.TrendingRepo;
 import com.aisummary.service.DeepSeekSummaryService;
 import com.aisummary.service.GitHubTrendingService;
 import com.aisummary.service.TwitterPostService;
@@ -11,7 +10,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class DailySummaryScheduler {
@@ -55,55 +53,43 @@ public class DailySummaryScheduler {
             var tweetIds = twitterService.postThread(summary);
             log.info("=== Daily job complete — posted {} tweets: {} ===", tweetIds.size(), tweetIds);
 
-            searchAndEngage(repos);
+            searchAndEngage(summary, tweetIds);
         } catch (Exception e) {
             log.error("Daily summary job failed", e);
         }
     }
 
-    private void searchAndEngage(List<TrendingRepo> repos) {
-        if (repos.isEmpty()) return;
-        try {
-            String query = repos.stream()
-                .limit(3)
-                .map(TrendingRepo::name)
-                .collect(Collectors.joining(" OR "));
+    private static final String AI_SEARCH_KEYWORDS =
+        "AI agent OR large language model OR machine learning OR "
+        + "deep learning OR generative AI OR LLM OR AI tool OR "
+        + "open source AI OR AI framework OR LLMOps OR AI deployment";
 
-            var relatedTweets = twitterService.searchRecentTweets(query, 10);
+    private void searchAndEngage(String summary, List<Long> threadTweetIds) {
+        if (threadTweetIds.isEmpty()) return;
+        try {
+            var relatedTweets = twitterService.searchRecentTweets(AI_SEARCH_KEYWORDS, 10);
             if (relatedTweets.isEmpty()) {
-                log.info("No related tweets found for query: {}", query);
+                log.info("No related AI tweets found");
                 return;
             }
 
             var topTweets = relatedTweets.stream().limit(3).toList();
-            String replyText = buildEngagementReply(repos);
+            StringBuilder sb = new StringBuilder("Related conversations happening right now:\n");
             for (var tweet : topTweets) {
-                try {
-                    long replyId = twitterService.replyToTweet(
-                        Long.parseLong(tweet.get("id")), replyText);
-                    log.info("Replied to tweet {} with id {}", tweet.get("id"), replyId);
-                    Thread.sleep(2000);
-                } catch (Exception e) {
-                    log.error("Failed to reply to tweet {}", tweet.get("id"), e);
-                }
+                String snippet = tweet.get("text");
+                if (snippet.length() > 80) snippet = snippet.substring(0, 77) + "...";
+                sb.append("\n\ntwitter.com/i/status/").append(tweet.get("id"));
+                sb.append("\n").append(snippet);
             }
+            if (sb.length() > 280) {
+                sb.setLength(277);
+                sb.append("...");
+            }
+
+            long replyId = twitterService.replyToTweet(threadTweetIds.getFirst(), sb.toString());
+            log.info("Posted engagement reply {} to thread", replyId);
         } catch (Exception e) {
             log.error("Search and engage failed", e);
         }
-    }
-
-    private String buildEngagementReply(List<TrendingRepo> repos) {
-        var top = repos.stream().limit(3).toList();
-        StringBuilder sb = new StringBuilder("Top trending AI repos right now:\n\n");
-        for (int i = 0; i < top.size(); i++) {
-            var r = top.get(i);
-            sb.append(i + 1).append(". ").append(r.fullName())
-              .append(" — ").append(r.url()).append("\n");
-        }
-        if (sb.length() > 270) {
-            sb.setLength(267);
-            sb.append("...");
-        }
-        return sb.toString();
     }
 }

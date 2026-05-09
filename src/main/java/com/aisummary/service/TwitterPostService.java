@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -139,9 +140,12 @@ public class TwitterPostService {
             var headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
 
-            String url = SEARCH_URL + "?query=" + percentEncode(query)
-                + "&max_results=" + maxResults
-                + "&tweet.fields=public_metrics,author_id";
+            String url = UriComponentsBuilder.fromHttpUrl(SEARCH_URL)
+                .queryParam("query", query)
+                .queryParam("max_results", maxResults)
+                .queryParam("tweet.fields", "public_metrics,author_id")
+                .build()
+                .toString();
 
             var response = restTemplate.exchange(
                 url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
