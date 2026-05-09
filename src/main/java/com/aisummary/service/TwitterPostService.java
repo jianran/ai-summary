@@ -158,10 +158,15 @@ public class TwitterPostService {
                     Map<String, String> entry = new LinkedHashMap<>();
                     entry.put("id", tweet.get("id").asText());
                     entry.put("text", tweet.get("text").asText());
+                    entry.put("author_id", tweet.get("author_id").asText(""));
                     JsonNode metrics = tweet.get("public_metrics");
                     if (metrics != null) {
-                        entry.put("likes", String.valueOf(metrics.get("like_count").asInt(0)));
-                        entry.put("retweets", String.valueOf(metrics.get("retweet_count").asInt(0)));
+                        int likes = metrics.get("like_count").asInt(0);
+                        int retweets = metrics.get("retweet_count").asInt(0);
+                        int replies = metrics.get("reply_count").asInt(0);
+                        int quotes = metrics.get("quote_count").asInt(0);
+                        int engagement = likes + retweets + replies + quotes;
+                        entry.put("engagement", String.valueOf(engagement));
                     }
                     results.add(entry);
                 }
@@ -179,6 +184,45 @@ public class TwitterPostService {
      */
     public long replyToTweet(long tweetId, String text) throws Exception {
         return postTweet(text, tweetId);
+    }
+
+    /**
+     * Quote-tweet another tweet (reposts with your comment on top).
+     * Unlike replies, quote tweets don't require prior engagement.
+     */
+    public long quoteTweet(long tweetId, String text) throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("text", text);
+        body.put("quote_tweet_id", String.valueOf(tweetId));
+
+        String bodyJson = objectMapper.writeValueAsString(body);
+
+        String oauthHeader = buildOAuthHeader();
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", oauthHeader);
+
+        var request = new HttpEntity<>(bodyJson, headers);
+        var response = restTemplate.exchange(
+            TWEET_URL, HttpMethod.POST, request, String.class);
+
+        JsonNode root = objectMapper.readTree(response.getBody());
+        JsonNode data = root.get("data");
+        if (data != null && data.has("id")) {
+            return Long.parseLong(data.get("id").asText());
+        }
+        throw new RuntimeException("No tweet ID in response: " + response.getBody());
+    }
+
+    /**
+     * Extract the authenticated user's Twitter ID from the OAuth 1.0a access token.
+     * Twitter access tokens have the format: {user_id}-{rest}.
+     */
+    public String getMyUserId() {
+        if (accessToken != null && accessToken.contains("-")) {
+            return accessToken.substring(0, accessToken.indexOf('-'));
+        }
+        return null;
     }
 
     private long postTweet(String text, Long inReplyToId) throws Exception {

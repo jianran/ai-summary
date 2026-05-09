@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -73,21 +74,33 @@ public class DailySummaryScheduler {
                 return;
             }
 
-            var topTweets = relatedTweets.stream().limit(3).toList();
-            StringBuilder sb = new StringBuilder("Related conversations happening right now:\n");
-            for (var tweet : topTweets) {
-                String snippet = tweet.get("text");
-                if (snippet.length() > 80) snippet = snippet.substring(0, 77) + "...";
-                sb.append("\n\ntwitter.com/i/status/").append(tweet.get("id"));
-                sb.append("\n").append(snippet);
-            }
-            if (sb.length() > 280) {
-                sb.setLength(277);
-                sb.append("...");
+            String myUserId = twitterService.getMyUserId();
+
+            var othersTweets = relatedTweets.stream()
+                .filter(t -> !t.getOrDefault("author_id", "").equals(myUserId))
+                .sorted(Comparator.comparingInt(
+                    t -> -Integer.parseInt(t.getOrDefault("engagement", "0"))))
+                .limit(3)
+                .toList();
+
+            if (othersTweets.isEmpty()) {
+                log.info("No related tweets from other users found");
+                return;
             }
 
+            log.info("Posting {} others' tweets by engagement to thread", othersTweets.size());
+
+            StringBuilder sb = new StringBuilder("People talking about AI right now:\n");
+            for (var tweet : othersTweets) {
+                int eng = Integer.parseInt(tweet.getOrDefault("engagement", "0"));
+                sb.append("\ntwitter.com/i/status/").append(tweet.get("id"));
+                sb.append("  (engagement: ").append(eng).append(")");
+            }
+            if (sb.length() > 280) sb.setLength(277);
+
             long replyId = twitterService.replyToTweet(threadTweetIds.getFirst(), sb.toString());
-            log.info("Posted engagement reply {} to thread", replyId);
+            log.info("Posted engagement reply {} linking to {} others' tweets",
+                replyId, othersTweets.size());
         } catch (Exception e) {
             log.error("Search and engage failed", e);
         }
