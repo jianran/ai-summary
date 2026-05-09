@@ -72,16 +72,17 @@ public class GitHubTrendingService {
     }
 
     public List<TrendingRepo> fetchTopAiRepos() {
-        String yesterday = Instant.now().minus(1, ChronoUnit.DAYS).toString().substring(0, 10);
+        String weekAgo = Instant.now().minus(7, ChronoUnit.DAYS).toString().substring(0, 10);
         String query = String.format(
             "topic:machine-learning,topic:deep-learning,topic:llm,topic:large-language-model,"
             + "topic:generative-ai,topic:ai-agent,topic:rag,topic:transformer,"
             + "topic:openai,topic:gpt,topic:chatgpt,topic:claude,topic:gemini,"
             + "topic:llama,topic:mistral,topic:deepseek,topic:anthropic+"
+            + "stars:>50+"
             + "pushed:>%s",
-            yesterday
+            weekAgo
         );
-        String url = String.format("%s?q=%s&sort=stars&order=desc&per_page=%d",
+        String url = String.format("%s?q=%s&sort=updated&order=desc&per_page=%d",
             SEARCH_URL, query, searchLimit);
 
         String token = resolveToken();
