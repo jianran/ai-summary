@@ -72,7 +72,7 @@ public class DailySummaryScheduler {
             String endTime = Instant.now().minus(30, ChronoUnit.SECONDS).toString();
             String startTime = Instant.now().minus(7, ChronoUnit.DAYS).toString();
 
-            var tweets = twitterService.searchTweets(AI_KEYWORDS, 100, startTime, endTime);
+            var tweets = twitterService.searchTweets(AI_KEYWORDS, 1000, startTime, endTime);
             if (tweets.isEmpty()) { log.info("No AI tweets found for roundup"); return; }
 
             String myUserId = twitterService.getMyUserId();
