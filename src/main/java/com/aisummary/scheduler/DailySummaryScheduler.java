@@ -68,7 +68,7 @@ public class DailySummaryScheduler {
     private void searchAndEngage(String summary, List<Long> threadTweetIds) {
         if (threadTweetIds.isEmpty()) return;
         try {
-            var relatedTweets = twitterService.searchRecentTweets(AI_SEARCH_KEYWORDS, 10);
+            var relatedTweets = twitterService.searchRecentTweets(AI_SEARCH_KEYWORDS, 100);
             if (relatedTweets.isEmpty()) {
                 log.info("No related AI tweets found");
                 return;
@@ -88,21 +88,48 @@ public class DailySummaryScheduler {
                 return;
             }
 
-            log.info("Posting {} others' tweets by engagement to thread", othersTweets.size());
-
-            StringBuilder sb = new StringBuilder("People talking about AI right now:\n");
+            String replyText = buildReplyText(summary);
+            int succeeded = 0;
             for (var tweet : othersTweets) {
-                int eng = Integer.parseInt(tweet.getOrDefault("engagement", "0"));
-                sb.append("\ntwitter.com/i/status/").append(tweet.get("id"));
-                sb.append("  (engagement: ").append(eng).append(")");
+                try {
+                    long replyId = twitterService.replyToTweet(
+                        Long.parseLong(tweet.get("id")), replyText);
+                    log.info("Replied directly to tweet {} (eng: {}) -> {}",
+                        tweet.get("id"), tweet.get("engagement"), replyId);
+                    succeeded++;
+                    Thread.sleep(2000);
+                } catch (Exception e) {
+                    log.warn("Direct reply to {} blocked — {}", tweet.get("id"), e.getMessage());
+                }
             }
-            if (sb.length() > 280) sb.setLength(277);
 
-            long replyId = twitterService.replyToTweet(threadTweetIds.getFirst(), sb.toString());
-            log.info("Posted engagement reply {} linking to {} others' tweets",
-                replyId, othersTweets.size());
+            if (succeeded == 0) {
+                StringBuilder sb = new StringBuilder("People talking about AI right now:\n");
+                for (var tweet : othersTweets) {
+                    sb.append("\ntwitter.com/i/status/").append(tweet.get("id"));
+                }
+                if (sb.length() > 280) sb.setLength(277);
+                long fallbackId = twitterService.replyToTweet(threadTweetIds.getFirst(), sb.toString());
+                log.info("Fallback: posted links to {} others' tweets as reply {}", othersTweets.size(), fallbackId);
+            } else {
+                log.info("Directly replied to {}/{} tweets", succeeded, othersTweets.size());
+            }
         } catch (Exception e) {
             log.error("Search and engage failed", e);
         }
+    }
+
+    private String buildReplyText(String summary) {
+        StringBuilder sb = new StringBuilder("Trending AI repos on GitHub this week:\n");
+        for (String line : summary.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.startsWith("TWEET:") && trimmed.contains("github.com/")) {
+                String tweet = trimmed.substring(6).trim();
+                int idx = tweet.indexOf("github.com/");
+                sb.append("\n").append(tweet.substring(idx));
+            }
+        }
+        if (sb.length() > 280) sb.setLength(277);
+        return sb.toString().trim();
     }
 }
