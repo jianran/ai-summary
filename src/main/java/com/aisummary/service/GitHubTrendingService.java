@@ -75,7 +75,9 @@ public class GitHubTrendingService {
         String yesterday = Instant.now().minus(1, ChronoUnit.DAYS).toString().substring(0, 10);
         String query = String.format(
             "topic:machine-learning,topic:deep-learning,topic:llm,topic:large-language-model,"
-            + "topic:generative-ai,topic:ai-agent,topic:rag,topic:transformer+"
+            + "topic:generative-ai,topic:ai-agent,topic:rag,topic:transformer,"
+            + "topic:openai,topic:gpt,topic:chatgpt,topic:claude,topic:gemini,"
+            + "topic:llama,topic:mistral,topic:deepseek,topic:anthropic+"
             + "pushed:>%s",
             yesterday
         );
