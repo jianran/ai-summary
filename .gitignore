@@ -1,1 +1,15 @@
 .claude/
+target/
+*.class
+*.jar
+*.war
+*.log
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+bin/
+.env
+*.env

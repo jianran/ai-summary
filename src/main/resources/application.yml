@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: ai-summary
+  main:
+    banner-mode: off
+
+  # Spring AI / DeepSeek (OpenAI-compatible)
+  ai:
+    openai:
+      api-key: ${DEEPSEEK_API_KEY}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      chat:
+        options:
+          model: ${DEEPSEEK_MODEL:deepseek-chat}
+          temperature: 0.7
+
+# DeepSeek custom config (used by DeepSeekConfig)
+deepseek:
+  api-key: ${DEEPSEEK_API_KEY}
+  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  model: ${DEEPSEEK_MODEL:deepseek-chat}
+
+# GitHub
+github:
+  token: ${GITHUB_TOKEN:}
+  search:
+    limit: 10
+
+# Twitter/X API credentials (OAuth 1.0a)
+twitter:
+  consumer-key: ${TWITTER_CONSUMER_KEY:}
+  consumer-secret: ${TWITTER_CONSUMER_SECRET:}
+  access-token: ${TWITTER_ACCESS_TOKEN:}
+  access-token-secret: ${TWITTER_ACCESS_TOKEN_SECRET:}
+
+# Application settings
+app:
+  daily-post:
+    enabled: ${DAILY_POST_ENABLED:false}
+    cron: ${DAILY_POST_CRON:0 0 9 * * *}
+
+logging:
+  level:
+    com.aisummary: INFO
