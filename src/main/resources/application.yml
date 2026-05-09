@@ -35,6 +35,8 @@ twitter:
   client-id: ${TWITTER_CLIENT_ID:}
   client-secret: ${TWITTER_CLIENT_SECRET:}
   bearer-token: ${TWITTER_BEARER_TOKEN:}
+  user-access-token: ${TWITTER_USER_ACCESS_TOKEN:}
+  user-refresh-token: ${TWITTER_USER_REFRESH_TOKEN:}
 
 # Application settings
 app:

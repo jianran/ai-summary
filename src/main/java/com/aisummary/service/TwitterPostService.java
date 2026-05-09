@@ -43,6 +43,7 @@ public class TwitterPostService {
     private final ObjectMapper objectMapper;
 
     private volatile String cachedBearerToken;
+    private final String userAccessToken;
 
     public TwitterPostService(TwitterConfig config, ObjectMapper objectMapper) {
         this.consumerKey = config.getConsumerKey();
@@ -52,6 +53,7 @@ public class TwitterPostService {
         this.clientId = config.getClientId();
         this.clientSecret = config.getClientSecret();
         this.bearerToken = config.getBearerToken();
+        this.userAccessToken = config.getUserAccessToken();
         this.restTemplate = new RestTemplate();
         this.objectMapper = objectMapper;
     }
@@ -180,10 +182,43 @@ public class TwitterPostService {
     }
 
     /**
-     * Reply to a specific tweet.
+     * Reply to a specific tweet. Tries OAuth 2.0 user token first (more permissive),
+     * then falls back to OAuth 1.0a.
      */
     public long replyToTweet(long tweetId, String text) throws Exception {
+        if (userAccessToken != null && !userAccessToken.isBlank()) {
+            try {
+                return replyWithOAuth2(tweetId, text);
+            } catch (Exception e) {
+                log.warn("OAuth 2.0 reply failed, trying OAuth 1.0a: {}", e.getMessage());
+            }
+        }
         return postTweet(text, tweetId);
+    }
+
+    private long replyWithOAuth2(long tweetId, String text) throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("text", text);
+        Map<String, String> reply = new HashMap<>();
+        reply.put("in_reply_to_tweet_id", String.valueOf(tweetId));
+        body.put("reply", reply);
+
+        String bodyJson = objectMapper.writeValueAsString(body);
+
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Authorization", "Bearer " + userAccessToken);
+
+        var request = new HttpEntity<>(bodyJson, headers);
+        var response = restTemplate.exchange(
+            TWEET_URL, HttpMethod.POST, request, String.class);
+
+        JsonNode root = objectMapper.readTree(response.getBody());
+        JsonNode data = root.get("data");
+        if (data != null && data.has("id")) {
+            return Long.parseLong(data.get("id").asText());
+        }
+        throw new RuntimeException("No tweet ID in response: " + response.getBody());
     }
 
     /**
