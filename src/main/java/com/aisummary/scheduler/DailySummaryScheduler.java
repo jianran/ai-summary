@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +69,10 @@ public class DailySummaryScheduler {
     private void postEngagementRoundup(List<Long> threadTweetIds) {
         if (threadTweetIds.isEmpty()) return;
         try {
-            var tweets = twitterService.searchTweets(AI_KEYWORDS, 100);
+            String endTime = Instant.now().minus(30, ChronoUnit.SECONDS).toString();
+            String startTime = Instant.now().minus(7, ChronoUnit.DAYS).toString();
+
+            var tweets = twitterService.searchTweets(AI_KEYWORDS, 100, startTime, endTime);
             if (tweets.isEmpty()) { log.info("No AI tweets found for roundup"); return; }
 
             String myUserId = twitterService.getMyUserId();

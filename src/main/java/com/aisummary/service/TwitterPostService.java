@@ -105,17 +105,22 @@ public class TwitterPostService {
 
     // ---- Search ----
 
-    public List<Map<String, String>> searchTweets(String query, int maxResults) {
+    public List<Map<String, String>> searchTweets(String query, int maxResults,
+            String startTime, String endTime) {
         String token = resolveBearerToken();
         if (token == null) { log.warn("No Bearer Token — skipping search"); return List.of(); }
         try {
             var headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + token);
-            String url = UriComponentsBuilder.fromHttpUrl(SEARCH_URL)
+            var builder = UriComponentsBuilder.fromHttpUrl(SEARCH_URL)
                 .queryParam("query", query)
                 .queryParam("max_results", maxResults)
-                .queryParam("tweet.fields", "public_metrics,author_id")
-                .build().toString();
+                .queryParam("tweet.fields", "public_metrics,author_id");
+            if (startTime != null && !startTime.isBlank())
+                builder.queryParam("start_time", startTime);
+            if (endTime != null && !endTime.isBlank())
+                builder.queryParam("end_time", endTime);
+            String url = builder.build().toString();
 
             var response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
             JsonNode data = objectMapper.readTree(response.getBody()).get("data");
@@ -135,7 +140,7 @@ public class TwitterPostService {
                     results.add(entry);
                 }
             }
-            log.info("Found {} tweets for query", results.size());
+            log.info("Found {} tweets for query ({} — {})", results.size(), startTime, endTime);
             return results;
         } catch (Exception e) { log.error("Search failed", e); return List.of(); }
     }
