@@ -36,6 +36,30 @@ public class DeepSeekSummaryService {
         this.chatModel = chatModel;
     }
 
+    public String generateTweetsSummary(String tweetsText) {
+        String tweetsPrompt = """
+            You are an AI technology analyst. Summarize the following top tweets about AI \
+            into a concise weekly digest.
+
+            Rules:
+            - Write in English
+            - Write 2-3 short paragraphs covering the main themes and highlights
+            - Mention the most engaging tweets or ideas
+            - Keep it under 500 characters
+            - Return plain text only, no prefixes
+            """;
+
+        var prompt = new Prompt(List.of(
+            new SystemMessage(tweetsPrompt),
+            new UserMessage(tweetsText)
+        ));
+
+        log.info("Sending tweet summary request to DeepSeek");
+        String response = chatModel.call(prompt).getResult().getOutput().getText();
+        log.info("Tweet summary generated ({} chars)", response.length());
+        return response;
+    }
+
     public String generateSummary(List<TrendingRepo> repos) {
         if (repos.isEmpty()) {
             return "No trending AI repos found today.";

@@ -1,5 +1,6 @@
 package com.aisummary.scheduler;
 
+import com.aisummary.service.DiscordMessageService;
 import com.aisummary.service.DeepSeekSummaryService;
 import com.aisummary.service.GitHubTrendingService;
 import com.aisummary.service.TwitterPostService;
@@ -12,8 +13,6 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
 
 @Component
 public class DailySummaryScheduler {
@@ -23,6 +22,7 @@ public class DailySummaryScheduler {
     private final GitHubTrendingService githubService;
     private final DeepSeekSummaryService summaryService;
     private final TwitterPostService twitterService;
+    private final DiscordMessageService discordService;
 
     @Value("${app.daily-post.enabled:false}")
     private boolean enabled;
@@ -30,10 +30,12 @@ public class DailySummaryScheduler {
     public DailySummaryScheduler(
             GitHubTrendingService githubService,
             DeepSeekSummaryService summaryService,
-            TwitterPostService twitterService) {
+            TwitterPostService twitterService,
+            DiscordMessageService discordService) {
         this.githubService = githubService;
         this.summaryService = summaryService;
         this.twitterService = twitterService;
+        this.discordService = discordService;
     }
 
     private static final String AI_KEYWORDS =
@@ -56,18 +58,16 @@ public class DailySummaryScheduler {
             String summary = summaryService.generateSummary(repos);
             log.info("DeepSeek summary:\n{}", summary);
 
-            var tweetIds = twitterService.postThread(summary);
-            log.info("Posted {} tweets: {}", tweetIds.size(), tweetIds);
+            twitterService.postThread(summary);
 
-            postEngagementRoundup(tweetIds);
+            postEngagementRoundup();
             log.info("=== Daily job complete ===");
         } catch (Exception e) {
             log.error("Daily summary job failed", e);
         }
     }
 
-    private void postEngagementRoundup(List<Long> threadTweetIds) {
-        if (threadTweetIds.isEmpty()) return;
+    private void postEngagementRoundup() {
         try {
             String endTime = Instant.now().minus(30, ChronoUnit.SECONDS).toString();
             String startTime = Instant.now().minus(7, ChronoUnit.DAYS).toString();
@@ -86,16 +86,23 @@ public class DailySummaryScheduler {
 
             if (top5.isEmpty()) { log.info("No others' tweets for roundup"); return; }
 
-            StringBuilder sb = new StringBuilder("Top AI conversations this week:\n\n");
+            StringBuilder tweetList = new StringBuilder("Top AI tweets this week by engagement:\n\n");
             for (int i = 0; i < top5.size(); i++) {
                 var t = top5.get(i);
-                sb.append(i + 1).append(". x.com/i/status/").append(t.get("id"))
-                  .append("  (").append(t.get("engagement")).append(" engagements)\n");
+                tweetList.append(i + 1).append(". ").append(t.get("text"))
+                  .append(" — by @").append(t.get("author_id"))
+                  .append(" | ").append(t.get("engagement")).append(" engagements\n");
+                tweetList.append("   https://x.com/i/status/").append(t.get("id")).append("\n\n");
             }
-            if (sb.length() > 280) sb.setLength(277);
 
-            long replyId = twitterService.replyToThread(threadTweetIds.getFirst(), sb.toString());
-            log.info("Posted engagement roundup reply {} with top {} tweets", replyId, top5.size());
+            String summary = summaryService.generateTweetsSummary(tweetList.toString());
+            log.info("DeepSeek summary of roundup:\n{}", summary);
+
+            String content = "Top AI conversations this week:\n\n" + summary;
+            if (content.length() > 2000) content = content.substring(0, 1997) + "...";
+
+            discordService.sendRoundup(content);
+            log.info("Sent engagement roundup to Discord with top {} tweets", top5.size());
         } catch (Exception e) {
             log.error("Engagement roundup failed", e);
         }

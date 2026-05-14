@@ -36,6 +36,11 @@ twitter:
   client-id: ${TWITTER_CLIENT_ID:}
   client-secret: ${TWITTER_CLIENT_SECRET:}
 
+# Discord bot config for sending engagement roundup via DM
+discord:
+  bot-token: ${DISCORD_BOT_TOKEN:}
+  target-user-id: ${DISCORD_TARGET_USER_ID:}
+
 # Application settings
 app:
   daily-post:
